@@ -208,7 +208,7 @@ class MoodTrajectoryEngine:
         1. Are near the target VA coordinate (emotion match)
         2. Are similar to user's acoustic fingerprint
         """
-        if self.similarity is None:
+        if self.similarity is None or self.similarity.size == 0 or query_vector is None:
             return []
 
         # Get content-based similarity results
@@ -295,14 +295,18 @@ class MoodTrajectoryEngine:
         trajectory_steps = []
         used_songs = set()
         prev_tempo = None
+        no_personalization = query_vector is None
 
         for v, a, label in path:
-            step_songs = self.find_songs_for_step(
-                target_va=(v, a),
-                query_vector=query_vector,
-                exclude_ids=used_songs,
-                top_k=n_songs_per_step * 3,
-            )
+            if no_personalization:
+                step_songs = []
+            else:
+                step_songs = self.find_songs_for_step(
+                    target_va=(v, a),
+                    query_vector=query_vector,
+                    exclude_ids=used_songs,
+                    top_k=n_songs_per_step * 3,
+                )
 
             # Apply smooth transition filter
             if smooth_transitions and prev_tempo and step_songs:
@@ -354,26 +358,32 @@ class MoodTrajectoryEngine:
         lines.append(f"🧭 MOOD TRAJECTORY: {result.start_mood} → {result.end_mood}")
         lines.append(f"{'='*60}")
 
+        total_steps = len(result.steps)
         for i, step in enumerate(result.steps):
             v, a = step.valence, step.arousal
             mood_label = self._va_to_label(v, a)
             bar_v = '█' * int(v * 20) + '░' * (20 - int(v * 20))
             bar_a = '█' * int(a * 10) + '░' * (10 - int(a * 10))
 
-            lines.append(f"\nStep {i+1}: {step.label}")
-            lines.append(f"  Valence {v:.2f} |{bar_v}| {mood_label}")
-            lines.append(f"  Arousal {a:.2f} |{bar_a}|")
+            lines.append(f"\nStage {i+1}/{total_steps}: {step.label}")
+            lines.append(f"  Valence {v:.2f}  |{bar_v}|  {mood_label}")
+            lines.append(f"  Arousal {a:.2f}  |{bar_a}|")
 
             if step.songs:
                 for j, song in enumerate(step.songs):
                     meta = song.get('metadata', {})
-                    title = meta.get('title', song['song_id'])[:30]
-                    lines.append(f"    {j+1}. {title} (fit: {song['final_score']:.2f})")
-            else:
-                lines.append(f"    (no songs found for this stage)")
+                    title = meta.get('title', song['song_id'])[:35]
+                    lines.append(f"    └─ ♪ {title}")
+                    lines.append(f"       match: {song['final_score']:.0%}")
 
-        lines.append(f"\n{'='*60}")
-        lines.append(f"Total: {result.total_songs} songs across {len(result.steps)} stages")
+        lines.append(f"\n{'─'*60}")
+        if result.total_songs > 0:
+            lines.append(f"📀 {result.total_songs} songs across {total_steps} emotional stages")
+        else:
+            lines.append(f"📀 {total_steps} emotional stages plotted")
+            lines.append(f"   → To get real song recs, build a music index first:")
+            lines.append(f"      python -m src.run build-index --dataset ./data/music/")
+            lines.append(f"   → Or add a favorite song file for personalized curation")
         lines.append(f"{'='*60}")
         return '\n'.join(lines)
 

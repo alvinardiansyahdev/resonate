@@ -1,0 +1,198 @@
+"""
+Interactive Mood Router — user-friendly interface for mood trajectory selection.
+Console-based UI that guides users through mood selection → trajectory generation.
+"""
+
+import os
+import sys
+from typing import Optional
+from pathlib import Path
+
+# Add parent to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from src.mood_trajectory import Mood, MoodTrajectoryEngine, DEFAULT_TRAJECTORIES
+from src.feature_extractor import AudioFeatureExtractor
+from src.emotion_analyzer import EmotionAnalyzer
+from src.similarity import SimilarityEngine
+
+
+class MoodRouter:
+    def __init__(self, data_dir: str = "./data"):
+        self.data_dir = data_dir
+        self.trajectory_engine = MoodTrajectoryEngine()
+        self.current_mood = None
+        self.trajectory_name = None
+
+    def show_welcome(self):
+        print("\n" + "="*60)
+        print("  🧠 PSYCHOACOUSTIC MOOD ROUTER")
+        print("  Your personal emotional music guide")
+        print("="*60)
+        print("\nHow are you feeling right now?")
+        print("This helps me plan the right musical journey for you.")
+
+    def select_mood(self) -> str:
+        moods = [
+            ("sad", "😢 Sad — heavy, melancholic, low energy"),
+            ("depressed", "😔 Depressed — hopeless, drained, empty"),
+            ("angry", "😠 Angry — frustrated, irritated, tense"),
+            ("anxious", "😰 Anxious — worried, restless, stressed"),
+            ("tired", "😴 Tired — exhausted, low energy, sluggish"),
+            ("tense", "😬 Tense — on edge, alert but uncomfortable"),
+            ("neutral", "😐 Neutral — not great, not terrible"),
+            ("calm", "😌 Calm — peaceful, centered, relaxed"),
+            ("happy", "😊 Happy — good, light, positive"),
+            ("excited", "🤩 Excited — energetic, pumped, enthusiastic"),
+        ]
+
+        for i, (name, desc) in enumerate(moods, 1):
+            print(f"  {i}. {desc}")
+
+        while True:
+            try:
+                choice = input(f"\nYour choice (1-{len(moods)}): ").strip()
+                idx = int(choice) - 1
+                if 0 <= idx < len(moods):
+                    self.current_mood = moods[idx][0]
+                    return self.current_mood
+            except ValueError:
+                pass
+            print(f"Please enter a number between 1 and {len(moods)}.")
+
+    def suggest_trajectories(self) -> str:
+        mood = self.current_mood
+
+        # Map current mood to suggested trajectories
+        suggestions = {
+            'sad':          [('sad_to_happy', "Guide you gently toward happiness"),
+                             ('neutral_to_happy', "Lift you up slowly")],
+            'depressed':    [('sad_to_happy', "Gentle rise toward lightness"),
+                             ('anxious_to_calm', "Find peace first")],
+            'angry':        [('angry_to_happy', "Release anger, find calm, then happy"),
+                             ('anxious_to_calm', "Calm down first")],
+            'anxious':      [('anxious_to_calm', "Slow down and find peace"),
+                             ('tired_to_focused', "Channel energy into focus")],
+            'tired':        [('tired_to_focused', "Wake up gently and find focus"),
+                             ('sad_to_happy', "Gentle energy lift")],
+            'tense':        [('anxious_to_calm', "Release tension, find calm"),
+                             ('angry_to_happy', "Process and release")],
+            'neutral':      [('neutral_to_happy', "Simple lift toward happiness"),
+                             ('sad_to_happy', "Gentle upward journey")],
+            'calm':         [('neutral_to_happy', "Maintain peace, add brightness")],
+            'happy':        [('neutral_to_happy', "Stay in a good place")],
+            'excited':      [('neutral_to_happy', "Channel that energy")],
+        }
+
+        available = suggestions.get(mood, [('neutral_to_happy', "Simple lift")])
+
+        print(f"\n🎯 I see you're feeling **{mood.upper()}**.")
+        print("Here's what I can do for you:\n")
+
+        # Filter to only available trajectories
+        valid = []
+        for key, desc in available:
+            if key in DEFAULT_TRAJECTORIES:
+                valid.append((key, desc))
+
+        if len(valid) == 1:
+            print(f"Recommended: {valid[0][1]}")
+            self.trajectory_name = valid[0][0]
+            return self.trajectory_name
+
+        for i, (key, desc) in enumerate(valid, 1):
+            traj_name = DEFAULT_TRAJECTORIES[key]['start'].label
+            traj_end = DEFAULT_TRAJECTORIES[key]['end'].label
+            print(f"  {i}. {traj_name} → {traj_end}")
+            print(f"     {desc}")
+
+        while True:
+            try:
+                choice = input(f"\nWhich journey sounds right? (1-{len(valid)}): ").strip()
+                idx = int(choice) - 1
+                if 0 <= idx < len(valid):
+                    self.trajectory_name = valid[idx][0]
+                    return self.trajectory_name
+            except ValueError:
+                pass
+            print(f"Please enter a number between 1 and {len(valid)}.")
+
+    def ask_favorite_song(self) -> Optional[str]:
+        print(f"\n🎵 To make this personal:")
+        print("  Do you have a song or favorite genre I can base this on?")
+        print("  (If not, I'll use general recommendations)")
+        path = input("  Path to your favorite song (or press Enter to skip): ").strip()
+        if path and os.path.exists(path):
+            return path
+        return None
+
+    def run(self):
+        self.show_welcome()
+        mood = self.select_mood()
+        traj = self.suggest_trajectories()
+        fav_song = self.ask_favorite_song()
+
+        print(f"\n✅ Route planned:")
+        print(f"   Current mood: {mood}")
+        print(f"   Trajectory: {traj}")
+        print(f"   Base song: {fav_song or 'general (no personalization)'}")
+
+        # Return configuration for the trajectory engine
+        return {
+            'mood': mood,
+            'trajectory': traj,
+            'favorite_song': fav_song,
+        }
+
+
+def run_interactive():
+    """Run the full interactive mood routing + trajectory experience."""
+    router = MoodRouter()
+    config = router.run()
+
+    # Initialize engines
+    extractor = AudioFeatureExtractor(n_mfcc=13)
+    similarity = SimilarityEngine(dim=93, index_type='flat')
+    analyzer = EmotionAnalyzer()
+
+    engine = MoodTrajectoryEngine(
+        similarity_engine=similarity,
+        emotion_analyzer=analyzer,
+    )
+
+    # Get query vector from favorite song
+    query_vector = None
+    if config['favorite_song']:
+        try:
+            features = extractor.extract(config['favorite_song'])
+            query_vector = extractor.to_vector(features)
+            query_emotion = analyzer.predict(config['favorite_song'])
+            print(f"\n📊 Your song's emotional profile:")
+            print(f"   Valence: {query_emotion['valence']:.2f}")
+            print(f"   Arousal: {query_emotion['arousal']:.2f}")
+            print(f"   Mood: {query_emotion['moods'][0]}")
+        except Exception as e:
+            print(f"  ⚠ Could not analyze song: {e}")
+    else:
+        print("\n📊 Using general recommendations (no personalization)")
+
+    # Build & display trajectory
+    result = engine.build_trajectory(
+        trajectory_name=config['trajectory'],
+        query_vector=query_vector,
+        n_songs_per_step=2,
+    )
+
+    print(engine.trajectory_to_timeline(result))
+
+    print("\n💡 Next steps for full experience:")
+    print("  1. Build a music index with 'python -m src.run build-index'")
+    print("  2. Add your own music collection to data/music/")
+    print("  3. Connect Spotify API for millions of songs")
+    print("  4. The trajectory becomes personalized with real song recommendations")
+
+    return result
+
+
+if __name__ == "__main__":
+    run_interactive()

@@ -82,13 +82,38 @@ def build_arc_tracks(from_mood: str, to_mood: str, steps: int) -> list[Track]:
     return tracks
 
 
+import re as _re
+
+async def _piped_streams(video_id: str, client: httpx.AsyncClient) -> dict:
+    r = await client.get(f"{PIPED_BASE}/streams/{video_id}")
+    if r.status_code != 200:
+        raise HTTPException(status_code=502, detail=f"Piped returned {r.status_code}")
+    return r.json()
+
+
 @router.get("/{track_id}/stream")
 async def get_stream_url(track_id: str):
     async with httpx.AsyncClient(timeout=15) as client:
-        r = await client.get(f"{PIPED_BASE}/streams/{track_id}")
-    if r.status_code != 200:
-        raise HTTPException(status_code=502, detail=f"Piped returned {r.status_code}")
-    data = r.json()
+        # Internal track IDs (t1-t30): resolve to YouTube ID via Piped search first
+        internal = next((t for t in TRACKS if t.id == track_id), None)
+        if internal:
+            q = f"{internal.title} {internal.artist}"
+            sr = await client.get(f"{PIPED_BASE}/search", params={"q": q, "filter": "music_songs"})
+            if sr.status_code != 200:
+                raise HTTPException(status_code=502, detail="Piped search failed")
+            items = sr.json().get("items", [])
+            if not items:
+                raise HTTPException(status_code=404, detail="No search results for track")
+            url = items[0].get("url", "")
+            m = _re.search(r"[?&]v=([A-Za-z0-9_-]{11})|/([A-Za-z0-9_-]{11})$", url)
+            if not m:
+                raise HTTPException(status_code=404, detail="Could not extract video ID")
+            video_id = m.group(1) or m.group(2)
+        else:
+            video_id = track_id
+
+        data = await _piped_streams(video_id, client)
+
     audio_streams = data.get("audioStreams", [])
     if not audio_streams:
         raise HTTPException(status_code=404, detail="No audio streams found")

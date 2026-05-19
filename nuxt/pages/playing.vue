@@ -167,11 +167,18 @@ const chapterWaypoints = computed(() => {
   return arc.waypoints?.length ? arc.waypoints : Array(7).fill({})
 })
 
-const upcoming = computed(() => [
-  { title: "Light", artist: "Sleeping at Last", dur: "4:51", chap: "V", mood: "calm", color: MOOD_COLORS.calm },
-  { title: "A Sky Full of Stars", artist: "Coldplay", dur: "4:28", chap: "VI", mood: "joy", color: MOOD_COLORS.joy },
-  { title: "Eyes", artist: "Kaskobi", dur: "3:18", chap: "VII", mood: "energy", color: MOOD_COLORS.energy },
-])
+const CHAP_NUMS = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]
+
+const upcoming = computed(() =>
+  player.queue.slice(0, 5).map((t, i) => ({
+    title: t.title,
+    artist: t.artist,
+    dur: formatTime(t.duration),
+    chap: CHAP_NUMS[arc.chapterIdx + 1 + i] ?? String(arc.chapterIdx + 2 + i),
+    mood: t.moodTag ?? "neutral",
+    color: MOOD_COLORS[t.moodTag ?? "neutral"] ?? MOOD_COLORS.neutral,
+  }))
+)
 
 function formatTime(seconds: number) {
   const m = Math.floor(seconds / 60)

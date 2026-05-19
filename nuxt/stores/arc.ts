@@ -35,6 +35,7 @@ export const useArc = defineStore("arc", () => {
     active.value = arc
     chapterIdx.value = 0
     const player = usePlayer()
+    player.queue.splice(0, player.queue.length, ...arc.tracks.slice(1))
     player.play(arc.tracks[0]!)
   }
 

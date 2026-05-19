@@ -52,6 +52,18 @@ async def create_arc(req: ArcRequest):
     return arc
 
 
+@router.post("/resolve-seed")
+async def resolve_seed_endpoint(body: dict):
+    from backend.services.playlist_generator import resolve_seed
+    seed_query = body.get("seed_query", "").strip()
+    if not seed_query:
+        raise HTTPException(status_code=422, detail="seed_query is required")
+    seed = await resolve_seed(seed_query)
+    if not seed:
+        raise HTTPException(status_code=404, detail="Song not found")
+    return {"title": seed["title"], "artist": seed["uploader"], "id": seed["id"]}
+
+
 _WAYPOINT_LABELS = ["start", "early", "rising", "midpoint", "deepening", "approaching", "arrive"]
 
 
@@ -86,6 +98,7 @@ async def create_playlist(req: PlaylistRequest):
 
     tracks = [Track(**{k: v for k, v in t.items() if k != "thumbnail"}) for t in result["tracks"]]
 
+    seed = result.get("seed", {})
     return Arc(
         id=str(uuid.uuid4())[:8],
         from_mood=req.from_mood,
@@ -94,4 +107,6 @@ async def create_playlist(req: PlaylistRequest):
         tracks=tracks,
         waypoints=waypoints,
         createdAt=datetime.now(timezone.utc).isoformat(),
+        seedTitle=seed.get("title"),
+        seedArtist=seed.get("artist"),
     )

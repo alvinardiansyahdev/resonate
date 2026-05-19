@@ -17,4 +17,6 @@ export interface Arc {
   tracks: Track[]
   waypoints: ArcWaypoint[]
   createdAt: string
+  seedTitle?: string
+  seedArtist?: string
 }

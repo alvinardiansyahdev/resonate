@@ -11,7 +11,7 @@ services:
       - PORT=8000
       - PIPED_BASE_URL=http://piped-backend:8080
     volumes:
-      - ./data:/app/data
+      - /opt/resonate-git/data:/app/data
     networks:
       - default
       - piped-docker_default

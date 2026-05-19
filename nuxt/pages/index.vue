@@ -82,18 +82,25 @@
           <input
             v-model="seedQuery"
             class="seed-input mono"
-            placeholder="e.g. Holocene – Bon Iver"
-            @keydown.enter="startArc(selectedShape)"
+            placeholder="e.g. Koi Iro Ni Somaru"
+            :disabled="isResolving || isGenerating"
+            @keydown.enter="resolveSeed"
+            @input="resolvedSeed = null"
           />
-          <button
-            v-if="seedQuery"
-            class="seed-clear"
-            @click="seedQuery = ''"
-            title="Clear"
-          >✕</button>
+          <button v-if="isResolving" class="seed-resolving" disabled>⟳</button>
+          <button v-else-if="seedQuery && !resolvedSeed" class="seed-go mono" @click="resolveSeed">→</button>
+          <button v-else-if="seedQuery" class="seed-clear" @click="clearSeed">✕</button>
         </div>
 
-        <div v-if="seedQuery" class="sim-row">
+        <!-- Resolved seed confirmation -->
+        <div v-if="resolvedSeed" class="seed-confirmed">
+          <span class="eyebrow-muted">FOUND</span>
+          <span class="seed-confirmed-title serif-i">{{ resolvedSeed.title }}</span>
+          <span class="eyebrow-muted" style="color:var(--faint)">{{ resolvedSeed.artist }}</span>
+        </div>
+        <div v-if="seedError" class="seed-err mono">{{ seedError }}</div>
+
+        <div v-if="resolvedSeed" class="sim-row">
           <span class="eyebrow-muted">FAMILIAR</span>
           <input
             v-model.number="similarityWeight"
@@ -120,8 +127,8 @@
 
       <button
         class="begin-btn serif-i"
-        :class="{ loading: isGenerating }"
-        :disabled="isGenerating"
+        :class="{ loading: isGenerating, 'needs-seed': seedQuery && !resolvedSeed && !isResolving }"
+        :disabled="isGenerating || (!!seedQuery && !resolvedSeed)"
         @click="startArc(selectedShape)"
       >
         <span>{{ isGenerating ? 'building playlist…' : 'begin the journey' }}</span>
@@ -145,10 +152,13 @@ const router = useRouter()
 const selectedMood = ref<MoodId>(moodStore.current ?? "neutral")
 const targetMood = ref<MoodId | undefined>(undefined)
 const seedQuery = ref("")
+const resolvedSeed = ref<{ title: string; artist: string; query: string } | null>(null)
 const similarityWeight = ref(0.7)
 const selectedShape = ref<ArcShape>("lift")
+const isResolving = ref(false)
 const isGenerating = ref(false)
 const generateError = ref("")
+const seedError = ref("")
 
 const FALLBACK_SHAPES = [
   { id: "stay",    label: "Stay where I am",  desc: "Hold this feeling. Lean in." },
@@ -197,6 +207,31 @@ function onTracePath(payload: { from: MoodId; to: MoodId }) {
   moodStore.selectMood(payload.from)
 }
 
+async function resolveSeed() {
+  const q = seedQuery.value.trim()
+  if (!q) return
+  seedError.value = ""
+  resolvedSeed.value = null
+  isResolving.value = true
+  try {
+    const res = await $fetch<{ title: string; artist: string }>("/api/arcs/resolve-seed", {
+      method: "POST",
+      body: { seed_query: q },
+    })
+    resolvedSeed.value = { title: res.title, artist: res.artist, query: q }
+  } catch {
+    seedError.value = "Song not found — try a different title or paste a YouTube URL."
+  } finally {
+    isResolving.value = false
+  }
+}
+
+function clearSeed() {
+  seedQuery.value = ""
+  resolvedSeed.value = null
+  seedError.value = ""
+}
+
 async function startArc(shape: string) {
   generateError.value = ""
   isGenerating.value = true
@@ -205,14 +240,14 @@ async function startArc(shape: string) {
       selectedMood.value,
       targetMood.value ?? selectedMood.value,
       shape as ArcShape,
-      seedQuery.value.trim()
-        ? { seedQuery: seedQuery.value.trim(), similarityWeight: similarityWeight.value }
+      resolvedSeed.value
+        ? { seedQuery: resolvedSeed.value.query, similarityWeight: similarityWeight.value }
         : undefined,
     )
     router.push("/playing")
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e)
-    generateError.value = "Could not build playlist — check your seed song or try again."
+    generateError.value = "Could not build playlist — try again."
     console.error(msg)
   } finally {
     isGenerating.value = false
@@ -390,6 +425,73 @@ async function startArc(shape: string) {
   cursor: pointer;
   padding: 0;
   line-height: 1;
+}
+
+.seed-go {
+  position: absolute;
+  right: 8px;
+  background: var(--accent);
+  border: none;
+  color: #1a0a26;
+  font-size: 13px;
+  font-weight: 700;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transition: opacity 0.15s;
+}
+
+.seed-go:hover { opacity: 0.85; }
+
+.seed-resolving {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 13px;
+  animation: spin 0.8s linear infinite;
+  padding: 0;
+  line-height: 1;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.seed-confirmed {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.seed-confirmed-title {
+  font-size: 14px;
+  color: var(--text-hi);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.seed-err {
+  font-size: 10px;
+  color: #f87171;
+  margin-top: 6px;
+  letter-spacing: 0.05em;
+}
+
+.begin-btn.needs-seed {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .sim-row {

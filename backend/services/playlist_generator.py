@@ -143,20 +143,22 @@ async def _search_songs(query: str, client: httpx.AsyncClient, piped_base: str) 
 
 
 async def get_candidates(seed_title: str, seed_uploader: str, piped_base: str = PIPED_BASE) -> list[dict]:
+    import asyncio
     queries = [
         seed_uploader,
         f"songs like {seed_title}",
-        f"{seed_title} similar artists",
-        f"{seed_uploader} similar",
+        f"{seed_title} similar",
+        f"{seed_uploader} discography",
     ]
     seen: set[str] = set()
     results: list[dict] = []
     async with httpx.AsyncClient(timeout=12) as client:
-        for q in queries:
-            for item in await _search_songs(q, client, piped_base):
-                if item["id"] not in seen:
-                    seen.add(item["id"])
-                    results.append(item)
+        batches = await asyncio.gather(*[_search_songs(q, client, piped_base) for q in queries])
+    for batch in batches:
+        for item in batch:
+            if item["id"] not in seen:
+                seen.add(item["id"])
+                results.append(item)
     return results
 
 

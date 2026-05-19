@@ -46,6 +46,8 @@ class Arc(BaseModel):
     tracks: List[Track]
     waypoints: List[ArcWaypoint]
     createdAt: str
+    seedTitle: Optional[str] = None
+    seedArtist: Optional[str] = None
 
 
 class ArcRequest(BaseModel):

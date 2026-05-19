@@ -94,14 +94,23 @@ def _resolve_video_id_from_search_item(url: str) -> str | None:
     return (m.group(1) or m.group(2)) if m else None
 
 
+_COOKIES_PATH = "/app/youtube_cookies.txt"
+_YTDLP_BASE_OPTS = {
+    "quiet": True,
+    "no_warnings": True,
+    "format": "bestaudio[ext=webm]/bestaudio/best",
+    "cookiefile": _COOKIES_PATH,
+    "extractor_args": {"youtube": {"player_client": ["web"]}},
+}
+
+import os as _os
+if not _os.path.exists(_COOKIES_PATH):
+    _YTDLP_BASE_OPTS.pop("cookiefile")
+
+
 def _ytdlp_stream(video_id: str) -> dict:
     import yt_dlp
-    with yt_dlp.YoutubeDL({
-        "quiet": True,
-        "no_warnings": True,
-        "format": "bestaudio[ext=webm]/bestaudio/best",
-        "extract_flat": False,
-    }) as ydl:
+    with yt_dlp.YoutubeDL(_YTDLP_BASE_OPTS) as ydl:
         info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
     if not info:
         raise ValueError("yt-dlp returned no info")
@@ -168,13 +177,8 @@ async def get_stream_url(track_id: str):
 
 def _ytdlp_stream_by_query(query: str) -> dict:
     import yt_dlp
-    with yt_dlp.YoutubeDL({
-        "quiet": True,
-        "no_warnings": True,
-        "format": "bestaudio[ext=webm]/bestaudio/best",
-        "default_search": "ytsearch1",
-        "extract_flat": False,
-    }) as ydl:
+    opts = {**_YTDLP_BASE_OPTS, "default_search": "ytsearch1"}
+    with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(f"ytsearch1:{query}", download=False)
     if not info:
         raise ValueError("yt-dlp: no results")

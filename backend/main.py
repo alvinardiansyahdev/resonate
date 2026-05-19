@@ -72,8 +72,14 @@ async def get_stream_by_id(id: str = Query(...)):
             }
 
     # Piped failed — fall back to yt-dlp
+    _cookies = "/app/youtube_cookies.txt"
+    import os as _os
+    _ytdlp_opts = {"quiet": True, "no_warnings": True, "format": "bestaudio/best"}
+    if _os.path.exists(_cookies):
+        _ytdlp_opts["cookiefile"] = _cookies
+
     def _ytdlp():
-        with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "format": "bestaudio/best"}) as ydl:
+        with yt_dlp.YoutubeDL(_ytdlp_opts) as ydl:
             info = ydl.extract_info(f"https://www.youtube.com/watch?v={id}", download=False)
         if not info:
             raise ValueError("yt-dlp returned no info")

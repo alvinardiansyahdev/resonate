@@ -271,6 +271,61 @@
   }
   footer a { color: var(--accent); text-decoration: none; }
 
+  /* Queue */
+  .queue { margin-top: 16px; display: none; }
+  .queue.visible { display: block; }
+  .queue-header {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text2);
+    font-weight: 600;
+    padding: 0 4px 8px;
+  }
+  .queue-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .queue-item:hover { background: var(--surface); }
+  .queue-item.active { background: var(--surface2); }
+  .queue-item.active .queue-num { color: var(--accent); }
+  .queue-num {
+    font-size: 12px;
+    color: var(--text2);
+    width: 18px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .queue-item img {
+    width: 36px; height: 36px;
+    border-radius: 4px;
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+  .queue-info { flex: 1; min-width: 0; }
+  .queue-info .title {
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .queue-info .meta {
+    font-size: 11px;
+    color: var(--text2);
+    margin-top: 1px;
+  }
+  .queue-dur {
+    font-size: 11px;
+    color: var(--text2);
+    flex-shrink: 0;
+  }
+
   /* Responsive */
   @media (max-width: 480px) {
     .container { padding: 16px 12px; }
@@ -329,6 +384,9 @@
     </div>
   </div>
 
+  <!-- Queue / Up Next -->
+  <div class="queue" id="queue"></div>
+
   <!-- Status / Loading -->
   <div class="status" id="status">
     <div class="spinner"></div>
@@ -347,6 +405,9 @@
 // ─── Configuration ──────────────────────────────────────────
 const PIPED_API = window.location.origin;
 const DISABLE_METADATA = true;  // don't send metadata to YouTube
+
+// Silent 1-frame WAV to unlock audio autoplay policy on first user gesture
+const SILENT_AUDIO = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
 
 // ─── Helpers ────────────────────────────────────────────────
 function getVideoId(item) {
@@ -391,6 +452,7 @@ audio.volume = 0.8;
 const elements = {
   results:   document.getElementById('results'),
   player:    document.getElementById('player'),
+  queue:     document.getElementById('queue'),
   status:    document.getElementById('status'),
   error:     document.getElementById('error'),
   statusText: document.getElementById('statusText'),
@@ -468,14 +530,20 @@ function playStream(item) {
   setPlayerPlaying();
 }
 
-function loadAndPlay(index) {
+function loadAndPlay(index, unlockFirst = false) {
   if (index < 0 || index >= queue.length) return;
   currentIndex = index;
   const item = queue[index];
 
-  // Show player immediately with loading state
   showStatus(false);
   showPlayerLoading(item);
+  renderQueue();
+
+  // Unlock audio context synchronously if called from user gesture
+  if (unlockFirst) {
+    audio.src = SILENT_AUDIO;
+    audio.play().catch(() => {});
+  }
 
   piped.getStream(item.videoId).then(stream => {
     item.audioUrl = stream.audioUrl;
@@ -484,6 +552,34 @@ function loadAndPlay(index) {
     showError('Failed to load stream: ' + e.message);
     setPlayerPaused();
   });
+}
+
+// ─── Queue UI ─────────────────────────────────────────────
+function renderQueue() {
+  if (queue.length <= 1) {
+    elements.queue.classList.remove('visible');
+    return;
+  }
+  elements.queue.innerHTML = '<div class="queue-header">Up Next</div>';
+  queue.forEach((item, i) => {
+    if (i === currentIndex) return;
+    const div = document.createElement('div');
+    div.className = 'queue-item' + (i === currentIndex ? ' active' : '');
+    const mins = Math.floor((item.duration || 0) / 60);
+    const secs = (item.duration || 0) % 60;
+    div.innerHTML = `
+      <span class="queue-num">${i + 1}</span>
+      <img src="${item.thumbnail || ''}" alt="" loading="lazy" onerror="this.style.display='none'">
+      <div class="queue-info">
+        <div class="title">${escapeHtml(item.title || 'Unknown')}</div>
+        <div class="meta">${escapeHtml(item.uploader || item.uploaderName || '')}</div>
+      </div>
+      <span class="queue-dur">${mins}:${secs.toString().padStart(2, '0')}</span>
+    `;
+    div.addEventListener('click', () => loadAndPlay(i, true));
+    elements.queue.appendChild(div);
+  });
+  elements.queue.classList.add('visible');
 }
 
 // ─── Audio Events ──────────────────────────────────────────
@@ -501,7 +597,7 @@ audio.addEventListener('ended', () => {
   if (currentIndex < queue.length - 1) {
     loadAndPlay(currentIndex + 1);
   } else {
-    elements.playBtn.textContent = '▶';
+    setPlayerPaused();
   }
 });
 
@@ -612,9 +708,10 @@ function renderResults(items) {
     div.addEventListener('click', () => {
       document.querySelectorAll('.result-item').forEach(el => el.classList.remove('active'));
       div.classList.add('active');
-      const item = { ...items[i], videoId: getVideoId(items[i]) };
-      queue = [item];
-      loadAndPlay(0);
+      // Build queue: selected song first, then the rest in order
+      const mapped = items.map(it => ({ ...it, videoId: getVideoId(it) }));
+      queue = [...mapped.slice(i), ...mapped.slice(0, i)];
+      loadAndPlay(0, true);  // true = unlock audio in this gesture context
     });
     elements.results.appendChild(div);
   });

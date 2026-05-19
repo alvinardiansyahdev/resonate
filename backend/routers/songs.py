@@ -95,17 +95,14 @@ def _resolve_video_id_from_search_item(url: str) -> str | None:
 
 
 _COOKIES_PATH = "/app/youtube_cookies.txt"
+
+import os as _os
 _YTDLP_BASE_OPTS = {
     "quiet": True,
     "no_warnings": True,
     "format": "bestaudio[ext=webm]/bestaudio/best",
-    "cookiefile": _COOKIES_PATH,
-    "extractor_args": {"youtube": {"player_client": ["web"]}},
+    **({"cookiefile": _COOKIES_PATH} if _os.path.exists(_COOKIES_PATH) else {}),
 }
-
-import os as _os
-if not _os.path.exists(_COOKIES_PATH):
-    _YTDLP_BASE_OPTS.pop("cookiefile")
 
 
 def _ytdlp_stream(video_id: str) -> dict:

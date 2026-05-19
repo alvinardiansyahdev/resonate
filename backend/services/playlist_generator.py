@@ -119,14 +119,13 @@ async def resolve_seed(query: str, piped_base: str = PIPED_BASE) -> Optional[dic
     return None
 
 
-async def get_related(video_id: str, piped_base: str = PIPED_BASE) -> list[dict]:
-    async with httpx.AsyncClient(timeout=12) as client:
-        r = await client.get(f"{piped_base}/streams/{video_id}")
+async def _search_songs(query: str, client: httpx.AsyncClient, piped_base: str) -> list[dict]:
+    try:
+        r = await client.get(f"{piped_base}/search", params={"q": query, "filter": "music_songs"})
         if r.status_code != 200:
             return []
-        related = r.json().get("relatedStreams", [])
         out = []
-        for item in related:
+        for item in r.json().get("items", []):
             url = item.get("url", "")
             vid = _extract_vid_id(url)
             if not vid:
@@ -139,6 +138,26 @@ async def get_related(video_id: str, piped_base: str = PIPED_BASE) -> list[dict]
                 "thumbnail": item.get("thumbnail", ""),
             })
         return out
+    except Exception:
+        return []
+
+
+async def get_candidates(seed_title: str, seed_uploader: str, piped_base: str = PIPED_BASE) -> list[dict]:
+    queries = [
+        seed_uploader,
+        f"songs like {seed_title}",
+        f"{seed_title} similar artists",
+        f"{seed_uploader} similar",
+    ]
+    seen: set[str] = set()
+    results: list[dict] = []
+    async with httpx.AsyncClient(timeout=12) as client:
+        for q in queries:
+            for item in await _search_songs(q, client, piped_base):
+                if item["id"] not in seen:
+                    seen.add(item["id"])
+                    results.append(item)
+    return results
 
 
 async def generate_playlist(
@@ -154,7 +173,7 @@ async def generate_playlist(
     if not seed:
         raise ValueError(f"Could not resolve seed song: {seed_query!r}")
 
-    candidates = await get_related(seed["id"], piped_base)
+    candidates = await get_candidates(seed["title"], seed["uploader"], piped_base)
     trajectory = build_trajectory(from_mood, to_mood, steps, shape)
     emotion_weight = 1.0 - similarity_weight
 

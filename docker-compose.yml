@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: resonate-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - PIPED_BASE_URL=http://piped-backend:8080
+    volumes:
+      - ./data:/app/data
+    networks:
+      - default
+      - piped-docker_default
+
+networks:
+  default: {}
+  piped-docker_default:
+    external: true

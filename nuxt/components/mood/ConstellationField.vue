@@ -94,6 +94,7 @@
           :cx="points[m.id].x" :cy="points[m.id].y"
           :fill="`url(#aura-g-${uid}-${m.id})`"
           :opacity="m.id === modelValue ? 0.55 : 0.18"
+          pointer-events="none"
           r="0"
         >
           <animate attributeName="r"
@@ -115,7 +116,9 @@
         <circle
           v-if="m.id === modelValue"
           :cx="points[m.id].x" :cy="points[m.id].y"
-          fill="none" :stroke="m.color" stroke-width="0.7" r="0"
+          fill="none" :stroke="m.color" stroke-width="0.7"
+          pointer-events="none"
+          r="0"
         >
           <animate attributeName="r"
             :values="`${orbR(m.id) + 4};${orbR(m.id) + 38};${orbR(m.id) + 4}`"
@@ -127,6 +130,7 @@
         <circle
           :cx="points[m.id].x" :cy="points[m.id].y"
           :fill="`url(#orb-g-${uid}-${m.id})`"
+          pointer-events="none"
           r="0"
         >
           <animate attributeName="r"

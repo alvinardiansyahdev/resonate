@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 def verify_signature(body: bytes, sig_header: str) -> bool:
     if not sig_header.startswith("sha256="):
         return False
-    expected = "sha256=" + hmac.new(SECRET, body, hashlib.sha256).hexdigest()
+    expected = "sha256=" + hmac.new(key=SECRET, msg=body, digestmod=hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, sig_header)
 
 
@@ -33,7 +33,8 @@ class WebhookHandler(BaseHTTPRequestHandler):
         sig = self.headers.get("X-Hub-Signature-256", "")
 
         if not verify_signature(body, sig):
-            logging.warning("Invalid signature")
+            computed = "sha256=" + hmac.new(key=SECRET, msg=body, digestmod=hashlib.sha256).hexdigest()
+            logging.warning(f"sig mismatch | got={sig[:30]} | want={computed[:30]}")
             self._respond(403, "forbidden")
             return
 

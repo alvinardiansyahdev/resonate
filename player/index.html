@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Resonate — music that meets you where you are</title>
+<style>
+  :root {
+    --bg: #0f0f11;
+    --surface: #1a1a1e;
+    --surface2: #24242a;
+    --border: #2e2e35;
+    --text: #e8e8ed;
+    --text2: #88889a;
+    --accent: #7c5cbf;
+    --accent2: #5a3d9a;
+    --green: #4ade80;
+    --yellow: #facc15;
+    --red: #f87171;
+    --radius: 12px;
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.5;
+  }
+  .container { width: 100%; max-width: 720px; padding: 24px 16px; }
+
+  /* Header */
+  header {
+    text-align: center;
+    padding: 40px 0 32px;
+  }
+  header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, var(--accent), #a78bfa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  header p {
+    color: var(--text2);
+    font-size: 14px;
+    margin-top: 6px;
+  }
+
+  /* Search */
+  .search-box {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+  .search-box input {
+    flex: 1;
+    padding: 12px 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 15px;
+    outline: none;
+    transition: border-color .2s;
+  }
+  .search-box input:focus { border-color: var(--accent); }
+  .search-box input::placeholder { color: var(--text2); }
+  .search-box button {
+    padding: 12px 20px;
+    border: none;
+    border-radius: var(--radius);
+    background: var(--accent);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .2s;
+  }
+  .search-box button:hover { background: var(--accent2); }
+  .search-box button:disabled { opacity: .5; cursor: not-allowed; }
+
+  /* Results */
+  .results { display: none; }
+  .results.visible { display: block; }
+  .result-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: background .15s;
+    margin-bottom: 4px;
+  }
+  .result-item:hover { background: var(--surface); }
+  .result-item.active { background: var(--surface2); }
+  .result-item img {
+    width: 48px; height: 48px;
+    border-radius: 6px;
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+  .result-info { flex: 1; min-width: 0; }
+  .result-info .title {
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .result-info .meta {
+    font-size: 12px;
+    color: var(--text2);
+    margin-top: 2px;
+  }
+  .result-info .duration {
+    font-size: 11px;
+    color: var(--text2);
+    margin-top: 2px;
+  }
+
+  /* Player */
+  .player { display: none; margin-top: 16px; }
+  .player.visible { display: block; }
+  .player-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+  .player-info { margin-bottom: 16px; }
+  .player-info .now-playing {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .player-info .title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-top: 4px;
+  }
+  .player-info .artist {
+    font-size: 13px;
+    color: var(--text2);
+    margin-top: 2px;
+  }
+
+  /* Custom audio controls */
+  .audio-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .controls-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+  }
+  .controls-row button {
+    background: none;
+    border: none;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 20px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background .2s;
+  }
+  .controls-row button:hover { background: var(--surface2); }
+  .controls-row .play-btn {
+    width: 56px; height: 56px;
+    background: var(--accent);
+    font-size: 24px;
+  }
+  .controls-row .play-btn:hover { background: var(--accent2); }
+  .progress-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--text2);
+    font-variant-numeric: tabular-nums;
+  }
+  .progress-bar {
+    flex: 1;
+    height: 4px;
+    background: var(--surface2);
+    border-radius: 2px;
+    cursor: pointer;
+    position: relative;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    width: 0%;
+    transition: width .1s linear;
+  }
+  .volume-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+  }
+  .volume-row span { font-size: 16px; }
+  .volume-slider {
+    flex: 0 0 120px;
+    -webkit-appearance: none;
+    height: 4px;
+    background: var(--surface2);
+    border-radius: 2px;
+    outline: none;
+  }
+  .volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+  }
+
+  /* Status */
+  .status {
+    text-align: center;
+    padding: 40px 0;
+    color: var(--text2);
+    font-size: 14px;
+  }
+  .status .spinner {
+    display: inline-block;
+    width: 24px; height: 24px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+    margin-bottom: 12px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Error */
+  .error {
+    text-align: center;
+    padding: 20px;
+    color: var(--red);
+    font-size: 14px;
+    background: rgba(248,113,113,.08);
+    border-radius: var(--radius);
+    display: none;
+  }
+  .error.visible { display: block; }
+
+  /* Footer */
+  footer {
+    text-align: center;
+    padding: 32px 0;
+    color: var(--text2);
+    font-size: 12px;
+  }
+  footer a { color: var(--accent); text-decoration: none; }
+
+  /* Responsive */
+  @media (max-width: 480px) {
+    .container { padding: 16px 12px; }
+    header { padding: 24px 0; }
+    header h1 { font-size: 22px; }
+    .search-box input { font-size: 14px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>Resonate</h1>
+    <p>Music that meets you where you are</p>
+  </header>
+
+  <!-- Search -->
+  <div class="search-box">
+    <input type="text" id="searchInput" placeholder="Search any song, artist, or mood..." autofocus>
+    <button id="searchBtn">Search</button>
+  </div>
+
+  <!-- Results -->
+  <div class="results" id="results"></div>
+
+  <!-- Player -->
+  <div class="player" id="player">
+    <div class="player-card">
+      <div class="player-info">
+        <div class="now-playing" id="nowPlaying">Now Playing</div>
+        <div class="title" id="nowTitle">—</div>
+        <div class="artist" id="nowArtist">—</div>
+      </div>
+
+      <div class="audio-controls">
+        <div class="controls-row">
+          <button id="prevBtn" title="Previous">⏮</button>
+          <button class="play-btn" id="playBtn" title="Play/Pause">▶</button>
+          <button id="nextBtn" title="Next">⏭</button>
+        </div>
+
+        <div class="progress-row">
+          <span id="currentTime">0:00</span>
+          <div class="progress-bar" id="progressBar">
+            <div class="progress-fill" id="progressFill"></div>
+          </div>
+          <span id="totalTime">0:00</span>
+        </div>
+
+        <div class="volume-row">
+          <span>🔊</span>
+          <input type="range" class="volume-slider" id="volumeSlider" min="0" max="1" step="0.05" value="0.8">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status / Loading -->
+  <div class="status" id="status">
+    <div class="spinner"></div>
+    <div id="statusText">Loading...</div>
+  </div>
+
+  <!-- Error -->
+  <div class="error" id="error"></div>
+
+  <footer>
+    Resonate &mdash; open source mood-driven music curation
+  </footer>
+</div>
+
+<script>
+// ─── Configuration ──────────────────────────────────────────
+const PIPED_API = window.location.origin;
+const DISABLE_METADATA = true;  // don't send metadata to YouTube
+
+// ─── Helpers ────────────────────────────────────────────────
+function getVideoId(item) {
+  if (item.videoId) return item.videoId;
+  const url = item.url || '';
+  const m = url.match(/[?&]v=([A-Za-z0-9_-]{11})/) || url.match(/([A-Za-z0-9_-]{11})$/);
+  return m ? m[1] : url.split('/').pop();
+}
+
+// ─── State ──────────────────────────────────────────────────
+let currentAudio = null;
+let currentIndex = -1;
+let searchResults = [];
+let queue = [];
+
+// ─── Piped API Client ──────────────────────────────────────
+const piped = {
+  async search(query) {
+    const r = await fetch(`${PIPED_API}/search?q=${encodeURIComponent(query)}&filter=videos`);
+    const data = await r.json();
+    return (data.items || []).filter(i => i.duration >= 30 && i.duration <= 600);
+  },
+
+  async getStream(videoId) {
+    const r = await fetch(`${PIPED_API}/api/stream?id=${videoId}`);
+    const data = await r.json();
+    return {
+      title: data.title || '',
+      uploader: data.uploader || '',
+      duration: data.duration || 0,
+      thumbnail: data.thumbnail || '',
+      audioUrl: data.url || null,
+      videoId,
+    };
+  }
+};
+
+// ─── Player ─────────────────────────────────────────────────
+const audio = new Audio();
+audio.volume = 0.8;
+
+const elements = {
+  results:   document.getElementById('results'),
+  player:    document.getElementById('player'),
+  status:    document.getElementById('status'),
+  error:     document.getElementById('error'),
+  statusText: document.getElementById('statusText'),
+  nowPlaying: document.getElementById('nowPlaying'),
+  nowTitle:  document.getElementById('nowTitle'),
+  nowArtist: document.getElementById('nowArtist'),
+  playBtn:   document.getElementById('playBtn'),
+  prevBtn:   document.getElementById('prevBtn'),
+  nextBtn:   document.getElementById('nextBtn'),
+  progressFill: document.getElementById('progressFill'),
+  currentTime:  document.getElementById('currentTime'),
+  totalTime:    document.getElementById('totalTime'),
+  volumeSlider: document.getElementById('volumeSlider'),
+  progressBar:  document.getElementById('progressBar'),
+  searchInput:  document.getElementById('searchInput'),
+  searchBtn:    document.getElementById('searchBtn'),
+};
+
+function formatTime(s) {
+  if (!s || isNaN(s)) return '0:00';
+  s = Math.floor(s);
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${m}:${sec.toString().padStart(2, '0')}`;
+}
+
+function showStatus(show, text) {
+  elements.status.style.display = show ? 'block' : 'none';
+  if (text) elements.statusText.textContent = text;
+}
+
+function showError(msg) {
+  elements.error.textContent = msg;
+  elements.error.classList.add('visible');
+  setTimeout(() => elements.error.classList.remove('visible'), 5000);
+}
+
+function updatePlayerInfo(item) {
+  if (!item) return;
+  elements.nowTitle.textContent = item.title || 'Unknown';
+  elements.nowArtist.textContent = item.uploader || item.uploaderName || 'Unknown artist';
+}
+
+function showPlayerLoading(item) {
+  updatePlayerInfo(item);
+  elements.player.classList.add('visible');
+  elements.playBtn.textContent = '⏳';
+  elements.nowPlaying.textContent = 'Loading stream...';
+}
+
+function setPlayerPlaying() {
+  elements.nowPlaying.textContent = 'Now Playing';
+  elements.playBtn.textContent = '⏸';
+}
+
+function setPlayerPaused() {
+  elements.playBtn.textContent = '▶';
+}
+
+function playStream(item) {
+  if (!item || !item.audioUrl) {
+    showError('No audio stream available for this track.');
+    setPlayerPaused();
+    return;
+  }
+
+  let url = item.audioUrl;
+  if (url.startsWith('/')) url = PIPED_API + url;
+
+  audio.src = url;
+  audio.play().catch(e => {
+    showError('Playback failed: ' + e.message);
+    setPlayerPaused();
+  });
+  setPlayerPlaying();
+}
+
+function loadAndPlay(index) {
+  if (index < 0 || index >= queue.length) return;
+  currentIndex = index;
+  const item = queue[index];
+
+  // Show player immediately with loading state
+  showStatus(false);
+  showPlayerLoading(item);
+
+  piped.getStream(item.videoId).then(stream => {
+    item.audioUrl = stream.audioUrl;
+    playStream(item);
+  }).catch(e => {
+    showError('Failed to load stream: ' + e.message);
+    setPlayerPaused();
+  });
+}
+
+// ─── Audio Events ──────────────────────────────────────────
+audio.addEventListener('timeupdate', () => {
+  const pct = (audio.currentTime / audio.duration) * 100;
+  elements.progressFill.style.width = Math.min(pct, 100) + '%';
+  elements.currentTime.textContent = formatTime(audio.currentTime);
+});
+
+audio.addEventListener('loadedmetadata', () => {
+  elements.totalTime.textContent = formatTime(audio.duration);
+});
+
+audio.addEventListener('ended', () => {
+  if (currentIndex < queue.length - 1) {
+    loadAndPlay(currentIndex + 1);
+  } else {
+    elements.playBtn.textContent = '▶';
+  }
+});
+
+audio.addEventListener('pause', () => {
+  elements.playBtn.textContent = '▶';
+});
+
+audio.addEventListener('play', () => {
+  elements.playBtn.textContent = '⏸';
+});
+
+audio.addEventListener('error', (e) => {
+  showError('Playback error. The stream may have expired.');
+  elements.playBtn.textContent = '▶';
+});
+
+audio.addEventListener('waiting', () => {
+  elements.playBtn.textContent = '⏳';
+});
+
+audio.addEventListener('canplay', () => {
+  if (!audio.paused) elements.playBtn.textContent = '⏸';
+});
+
+audio.addEventListener('stalled', () => {
+  elements.playBtn.textContent = '⏳';
+});
+
+// ─── Controls ──────────────────────────────────────────────
+elements.playBtn.addEventListener('click', () => {
+  if (audio.paused) {
+    audio.play().catch(() => {});
+  } else {
+    audio.pause();
+  }
+});
+
+elements.prevBtn.addEventListener('click', () => {
+  if (currentIndex > 0) loadAndPlay(currentIndex - 1);
+});
+
+elements.nextBtn.addEventListener('click', () => {
+  if (currentIndex < queue.length - 1) loadAndPlay(currentIndex + 1);
+});
+
+elements.progressBar.addEventListener('click', (e) => {
+  const rect = e.currentTarget.getBoundingClientRect();
+  const pct = (e.clientX - rect.left) / rect.width;
+  audio.currentTime = pct * audio.duration;
+});
+
+elements.volumeSlider.addEventListener('input', () => {
+  audio.volume = parseFloat(elements.volumeSlider.value);
+});
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT') return;  // typing in search
+  if (e.code === 'Space') { e.preventDefault(); elements.playBtn.click(); }
+  if (e.code === 'ArrowLeft') elements.prevBtn.click();
+  if (e.code === 'ArrowRight') elements.nextBtn.click();
+});
+
+// ─── Search ────────────────────────────────────────────────
+async function doSearch(query) {
+  if (!query.trim()) return;
+
+  elements.results.classList.remove('visible');
+  elements.results.innerHTML = '';
+  showStatus(true, `Searching "${query}"...`);
+
+  try {
+    const items = await piped.search(query);
+    showStatus(false);
+
+    if (items.length === 0) {
+      elements.results.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text2)">No results found</div>';
+      elements.results.classList.add('visible');
+      return;
+    }
+
+    searchResults = items;
+    renderResults(items);
+  } catch (e) {
+    showStatus(false);
+    showError('Search failed: ' + e.message);
+  }
+}
+
+function renderResults(items) {
+  elements.results.innerHTML = '';
+  items.forEach((item, i) => {
+    const div = document.createElement('div');
+    div.className = 'result-item';
+    const thumb = item.thumbnail || '';
+    const mins = Math.floor(item.duration / 60);
+    const secs = item.duration % 60;
+    const views = item.views ? Number(item.views).toLocaleString() : '?';
+
+    div.innerHTML = `
+      <img src="${thumb}" alt="" loading="lazy" onerror="this.style.display='none'">
+      <div class="result-info">
+        <div class="title">${escapeHtml(item.title || 'Unknown')}</div>
+        <div class="meta">${escapeHtml(item.uploader || item.uploaderName || 'Unknown')}</div>
+        <div class="duration">${mins}:${secs.toString().padStart(2, '0')} · ${views} views</div>
+      </div>
+    `;
+    div.addEventListener('click', () => {
+      document.querySelectorAll('.result-item').forEach(el => el.classList.remove('active'));
+      div.classList.add('active');
+      const item = { ...items[i], videoId: getVideoId(items[i]) };
+      queue = [item];
+      loadAndPlay(0);
+    });
+    elements.results.appendChild(div);
+  });
+  elements.results.classList.add('visible');
+}
+
+function escapeHtml(text) {
+  const d = document.createElement('div');
+  d.textContent = text;
+  return d.innerHTML;
+}
+
+// ─── Event Bindings ────────────────────────────────────────
+elements.searchBtn.addEventListener('click', () => doSearch(elements.searchInput.value));
+elements.searchInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') doSearch(elements.searchInput.value);
+});
+
+// Auto-focus
+elements.searchInput.focus();
+
+// Initial state
+showStatus(false);
+</script>
+</body>
+</html>

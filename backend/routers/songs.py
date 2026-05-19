@@ -1,8 +1,12 @@
 import math
+import os
 import random
+import httpx
 from fastapi import APIRouter, HTTPException
 from backend.models.schemas import Track, MoodId
 from backend.routers.mood import MOOD_MAP
+
+PIPED_BASE = os.getenv("PIPED_BASE_URL", "http://piped:8080")
 
 router = APIRouter()
 
@@ -76,6 +80,20 @@ def build_arc_tracks(from_mood: str, to_mood: str, steps: int) -> list[Track]:
             used_ids.add(picked.id)
         tracks.append(picked)
     return tracks
+
+
+@router.get("/{track_id}/stream")
+async def get_stream_url(track_id: str):
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.get(f"{PIPED_BASE}/streams/{track_id}")
+    if r.status_code != 200:
+        raise HTTPException(status_code=502, detail=f"Piped returned {r.status_code}")
+    data = r.json()
+    audio_streams = data.get("audioStreams", [])
+    if not audio_streams:
+        raise HTTPException(status_code=404, detail="No audio streams found")
+    best = max(audio_streams, key=lambda s: s.get("bitrate", 0))
+    return {"url": best["url"], "mimeType": best.get("mimeType", "audio/webm"), "duration": data.get("duration", 0)}
 
 
 @router.get("/{track_id}", response_model=Track)

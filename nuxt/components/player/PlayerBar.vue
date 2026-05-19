@@ -12,8 +12,9 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="19,20 9,12 19,4"/><rect x="5" y="4" width="2" height="16"/></svg>
       </button>
 
-      <button class="play-btn" @click="player.toggle()" aria-label="Play/Pause">
-        <svg v-if="player.isPlaying" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+      <button class="play-btn" @click="player.toggle()" aria-label="Play/Pause" :disabled="player.isLoading">
+        <svg v-if="player.isLoading" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+        <svg v-else-if="player.isPlaying" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
         <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>
       </button>
 
@@ -38,7 +39,8 @@
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
     </div>
 
-    <span class="shortcuts-hint mono">SPACE · ← →</span>
+    <span v-if="player.streamError" class="stream-error mono">{{ player.streamError }}</span>
+    <span v-else class="shortcuts-hint mono">SPACE · ← →</span>
   </div>
 </template>
 
@@ -189,5 +191,18 @@ function formatTime(seconds: number) {
   font-size: 9px;
   color: var(--faint);
   letter-spacing: 0.2em;
+}
+
+.stream-error {
+  font-size: 9px;
+  color: #f87171;
+  letter-spacing: 0.1em;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.spin {
+  animation: spin 0.8s linear infinite;
 }
 </style>

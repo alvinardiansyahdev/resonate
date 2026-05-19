@@ -83,12 +83,56 @@ def build_arc_tracks(from_mood: str, to_mood: str, steps: int) -> list[Track]:
 
 
 import re as _re
+import asyncio as _asyncio
+from concurrent.futures import ThreadPoolExecutor as _TPE
 
-async def _piped_streams(video_id: str, client: httpx.AsyncClient) -> dict:
+_executor = _TPE(max_workers=4)
+
+
+def _resolve_video_id_from_search_item(url: str) -> str | None:
+    m = _re.search(r"[?&]v=([A-Za-z0-9_-]{11})|/([A-Za-z0-9_-]{11})$", url)
+    return (m.group(1) or m.group(2)) if m else None
+
+
+def _ytdlp_stream(video_id: str) -> dict:
+    import yt_dlp
+    with yt_dlp.YoutubeDL({
+        "quiet": True,
+        "no_warnings": True,
+        "format": "bestaudio[ext=webm]/bestaudio/best",
+        "extract_flat": False,
+    }) as ydl:
+        info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
+    if not info:
+        raise ValueError("yt-dlp returned no info")
+    audio_url = info.get("url")
+    if not audio_url:
+        for fmt in info.get("formats", []):
+            if fmt.get("acodec") and fmt["acodec"] != "none" and fmt.get("url"):
+                audio_url = fmt["url"]
+                break
+    if not audio_url:
+        raise ValueError("No audio URL found")
+    return {
+        "url": audio_url,
+        "mimeType": "audio/webm",
+        "duration": info.get("duration", 0),
+    }
+
+
+async def _resolve_stream(video_id: str, client: httpx.AsyncClient) -> dict:
+    # Try Piped first
     r = await client.get(f"{PIPED_BASE}/streams/{video_id}")
-    if r.status_code != 200:
-        raise HTTPException(status_code=502, detail=f"Piped returned {r.status_code}")
-    return r.json()
+    if r.status_code == 200:
+        data = r.json()
+        streams = data.get("audioStreams", [])
+        if streams:
+            best = max(streams, key=lambda s: s.get("bitrate", 0))
+            return {"url": best["url"], "mimeType": best.get("mimeType", "audio/webm"), "duration": data.get("duration", 0)}
+
+    # Piped failed — fall back to yt-dlp
+    loop = _asyncio.get_event_loop()
+    return await loop.run_in_executor(_executor, _ytdlp_stream, video_id)
 
 
 @router.get("/{track_id}/stream")
@@ -99,26 +143,51 @@ async def get_stream_url(track_id: str):
         if internal:
             q = f"{internal.title} {internal.artist}"
             sr = await client.get(f"{PIPED_BASE}/search", params={"q": q, "filter": "music_songs"})
-            if sr.status_code != 200:
-                raise HTTPException(status_code=502, detail="Piped search failed")
-            items = sr.json().get("items", [])
-            if not items:
-                raise HTTPException(status_code=404, detail="No search results for track")
-            url = items[0].get("url", "")
-            m = _re.search(r"[?&]v=([A-Za-z0-9_-]{11})|/([A-Za-z0-9_-]{11})$", url)
-            if not m:
-                raise HTTPException(status_code=404, detail="Could not extract video ID")
-            video_id = m.group(1) or m.group(2)
+            if sr.status_code == 200:
+                items = sr.json().get("items", [])
+                vid = _resolve_video_id_from_search_item(items[0].get("url", "")) if items else None
+            else:
+                vid = None
+            if not vid:
+                # Piped search failed — let yt-dlp search by title
+                loop = _asyncio.get_event_loop()
+                try:
+                    result = await loop.run_in_executor(_executor, _ytdlp_stream_by_query, f"{internal.title} {internal.artist}")
+                    return result
+                except Exception as e:
+                    raise HTTPException(status_code=502, detail=str(e))
+            video_id = vid
         else:
             video_id = track_id
 
-        data = await _piped_streams(video_id, client)
+        try:
+            return await _resolve_stream(video_id, client)
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=str(e))
 
-    audio_streams = data.get("audioStreams", [])
-    if not audio_streams:
-        raise HTTPException(status_code=404, detail="No audio streams found")
-    best = max(audio_streams, key=lambda s: s.get("bitrate", 0))
-    return {"url": best["url"], "mimeType": best.get("mimeType", "audio/webm"), "duration": data.get("duration", 0)}
+
+def _ytdlp_stream_by_query(query: str) -> dict:
+    import yt_dlp
+    with yt_dlp.YoutubeDL({
+        "quiet": True,
+        "no_warnings": True,
+        "format": "bestaudio[ext=webm]/bestaudio/best",
+        "default_search": "ytsearch1",
+        "extract_flat": False,
+    }) as ydl:
+        info = ydl.extract_info(f"ytsearch1:{query}", download=False)
+    if not info:
+        raise ValueError("yt-dlp: no results")
+    entry = info.get("entries", [info])[0] if "entries" in info else info
+    audio_url = entry.get("url")
+    if not audio_url:
+        for fmt in entry.get("formats", []):
+            if fmt.get("acodec") and fmt["acodec"] != "none" and fmt.get("url"):
+                audio_url = fmt["url"]
+                break
+    if not audio_url:
+        raise ValueError("yt-dlp: no audio URL")
+    return {"url": audio_url, "mimeType": "audio/webm", "duration": entry.get("duration", 0)}
 
 
 @router.get("/{track_id}", response_model=Track)

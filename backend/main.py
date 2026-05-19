@@ -51,27 +51,42 @@ async def piped_search(q: str = Query(...), filter: str = Query("videos")):
 
 @app.get("/api/stream")
 async def get_stream_by_id(id: str = Query(...)):
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+    import yt_dlp
+
     async with httpx.AsyncClient(timeout=15) as client:
         r = await client.get(f"{PIPED_BASE}/streams/{id}")
-    if r.status_code != 200:
-        raise HTTPException(status_code=502, detail=f"Piped streams returned {r.status_code}")
-    data = r.json()
-    audio_streams = data.get("audioStreams", [])
-    if audio_streams:
-        audio_streams.sort(key=lambda s: s.get("bitrate", 0), reverse=True)
-        audio_url = audio_streams[0].get("url", "")
-    else:
-        video_streams = data.get("videoStreams", [])
-        audio_url = video_streams[0].get("url", "") if video_streams else None
-    if not audio_url:
-        raise HTTPException(status_code=404, detail="No audio stream found")
-    return {
-        "title": data.get("title", ""),
-        "uploader": data.get("uploader", ""),
-        "duration": data.get("duration", 0),
-        "thumbnail": data.get("thumbnailUrl", ""),
-        "url": audio_url,
-    }
+
+    if r.status_code == 200:
+        data = r.json()
+        audio_streams = data.get("audioStreams", [])
+        if audio_streams:
+            audio_streams.sort(key=lambda s: s.get("bitrate", 0), reverse=True)
+            return {
+                "title": data.get("title", ""),
+                "uploader": data.get("uploader", ""),
+                "duration": data.get("duration", 0),
+                "thumbnail": data.get("thumbnailUrl", ""),
+                "url": audio_streams[0]["url"],
+            }
+
+    # Piped failed — fall back to yt-dlp
+    def _ytdlp():
+        with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "format": "bestaudio/best"}) as ydl:
+            info = ydl.extract_info(f"https://www.youtube.com/watch?v={id}", download=False)
+        if not info:
+            raise ValueError("yt-dlp returned no info")
+        url = info.get("url") or next((f["url"] for f in info.get("formats", []) if f.get("acodec") != "none" and f.get("url")), None)
+        if not url:
+            raise ValueError("No audio URL")
+        return {"title": info.get("title", ""), "uploader": info.get("uploader", ""), "duration": info.get("duration", 0), "thumbnail": info.get("thumbnail", ""), "url": url}
+
+    try:
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(ThreadPoolExecutor(max_workers=2), _ytdlp)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
 
 
 _player_dir = Path(__file__).parent.parent / "player"

@@ -28,7 +28,7 @@ app.include_router(mood.router, prefix="/api/moods", tags=["mood"])
 app.include_router(songs.router, prefix="/api/tracks", tags=["tracks"])
 app.include_router(trajectory.router, prefix="/api/arcs", tags=["arcs"])
 app.include_router(journal.router, prefix="/api/journal", tags=["journal"])
-app.include_router(webhook.router, prefix="/api/webhook", tags=["webhook"])
+app.include_router(webhook.router, prefix="/api/deploy", tags=["deploy"])
 
 
 @app.get("/api/health")

@@ -29,3 +29,14 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Nuxt / Node
+nuxt/node_modules/
+nuxt/.nuxt/
+nuxt/.output/
+nuxt/.verify-screenshots/
+
+# Screenshots / design images
+*.png
+*.jpg
+*.jpeg

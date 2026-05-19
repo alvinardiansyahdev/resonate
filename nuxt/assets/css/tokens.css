@@ -1,0 +1,65 @@
+:root {
+  --bg-0: #0d0612;
+  --bg-1: #180e22;
+  --bg-2: #241433;
+  --surface: rgba(28, 18, 38, 0.55);
+  --surface-hi: rgba(40, 26, 56, 0.78);
+  --border: rgba(245, 235, 250, 0.10);
+  --border-hi: rgba(245, 235, 250, 0.22);
+  --text: #f5ebfa;
+  --text-hi: #fbf6ed;
+  --muted: rgba(245, 235, 250, 0.58);
+  --faint: rgba(245, 235, 250, 0.34);
+  --gold: #e8c887;
+  --gold-hi: #fde68a;
+
+  --accent: #c084fc;
+  --accent-2: #f0abfc;
+  --mood-glow: rgba(192, 132, 252, 0.3);
+
+  --font-serif: "Instrument Serif", Georgia, serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-pill: 999px;
+
+  --blur-sm: 8px;
+  --blur-md: 16px;
+  --blur-lg: 24px;
+}
+
+.serif { font-family: var(--font-serif); font-weight: 400; }
+.serif-i { font-family: var(--font-serif); font-style: italic; font-weight: 400; }
+.mono { font-family: var(--font-mono); }
+.italic { font-style: italic; }
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  color: var(--gold);
+  text-transform: uppercase;
+  letter-spacing: 0.25em;
+}
+
+.eyebrow-muted {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.25em;
+}
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }

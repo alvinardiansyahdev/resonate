@@ -29,12 +29,13 @@ export const useArc = defineStore("arc", () => {
           method: "POST",
           body: { from_mood: from, to_mood: to, shape },
         })
+    if (!arc.tracks || arc.tracks.length === 0) {
+      throw new Error("No tracks returned — try a different seed song.")
+    }
     active.value = arc
     chapterIdx.value = 0
     const player = usePlayer()
-    if (arc.tracks.length > 0) {
-      player.play(arc.tracks[0]!)
-    }
+    player.play(arc.tracks[0]!)
   }
 
   return { active, waypoints, chapterIdx, begin }

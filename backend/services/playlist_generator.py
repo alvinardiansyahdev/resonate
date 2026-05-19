@@ -179,8 +179,29 @@ async def generate_playlist(
     trajectory = build_trajectory(from_mood, to_mood, steps, shape)
     emotion_weight = 1.0 - similarity_weight
 
+    # Seed song is track 0 (step 0 of trajectory)
+    seed_va = estimate_va(seed["title"], seed["uploader"])
+    seed_mood = min(
+        MOOD_VA.items(),
+        key=lambda x: math.sqrt((x[1][0] - seed_va[0]) ** 2 + (x[1][1] - seed_va[1]) ** 2),
+    )[0]
+    tracks = [{
+        "id": seed["id"],
+        "title": seed["title"],
+        "artist": seed["uploader"],
+        "album": "",
+        "duration": seed["duration"],
+        "streamUrl": f"https://www.youtube.com/watch?v={seed['id']}",
+        "moodTag": seed_mood,
+        "valence": round(seed_va[0], 3),
+        "arousal": round(seed_va[1], 3),
+        "thumbnail": "",
+    }]
+
+    if not candidates:
+        raise ValueError("No candidate songs found — try a different seed song or check Piped connection.")
+
     used: set[str] = {seed["id"]}
-    tracks = []
 
     for step_idx, (tv, ta) in enumerate(trajectory):
         best = None

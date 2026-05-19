@@ -11,7 +11,7 @@ services:
       - WEBHOOK_SECRET=75495522454444e2033a2486f9ca4fc21237d04d58d0c3a5e7f312a48bd143d5
     volumes:
       - /opt/resonate-git/data:/app/data
-      - /root/Piped-Docker/cookies_yt.txt:/app/youtube_cookies.txt:ro
+      - /root/Piped-Docker/cookies_yt.txt:/app/youtube_cookies.txt
     networks:
       - default
       - piped-docker_default

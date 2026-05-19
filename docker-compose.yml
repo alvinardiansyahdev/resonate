@@ -8,6 +8,7 @@ services:
     environment:
       - PORT=8000
       - PIPED_BASE_URL=http://piped-backend:8080
+      - WEBHOOK_SECRET=75495522454444e2033a2486f9ca4fc21237d04d58d0c3a5e7f312a48bd143d5
     volumes:
       - /opt/resonate-git/data:/app/data
     networks:

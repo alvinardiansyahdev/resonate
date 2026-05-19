@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-from backend.routers import mood, trajectory, songs, journal
+from backend.routers import mood, trajectory, songs, journal, webhook
 
 app = FastAPI(
     title="Resonate API",
@@ -28,6 +28,7 @@ app.include_router(mood.router, prefix="/api/moods", tags=["mood"])
 app.include_router(songs.router, prefix="/api/tracks", tags=["tracks"])
 app.include_router(trajectory.router, prefix="/api/arcs", tags=["arcs"])
 app.include_router(journal.router, prefix="/api/journal", tags=["journal"])
+app.include_router(webhook.router, prefix="/api/webhook", tags=["webhook"])
 
 
 @app.get("/api/health")
